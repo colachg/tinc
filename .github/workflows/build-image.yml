@@ -1,0 +1,25 @@
+name: build-image
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v1
+
+      - name: build docker image
+        run: |
+          docker build . -t ${IMAGE_NAME}:v`date +%Y%m%d`
+      - name: push image to qcloud
+        run: |
+          docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+          docker push ${IMAGE_NAME}:v`date +%Y%m%d`
+        env:
+          IMAGE_NAME: "colachen/tinc"
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
