@@ -14,11 +14,12 @@ jobs:
 
       - name: build docker image
         run: |
-          docker build . -t colachen/tinc:v`date +%Y%m%d`
+          docker build . -t colachen/tinc:v`date +%Y%m%d` -t colachen/tinc
       - name: push image to qcloud
         run: |
           docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
           docker push colachen/tinc:v`date +%Y%m%d`
+          docker push colachen/tinc
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
