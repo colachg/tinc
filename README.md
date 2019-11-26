@@ -21,21 +21,22 @@ The Tinc VPN itself will use the dedicated network 192.168.0.0/29.
 
 ## Quick start
 
-```shell
-docker run -d \
-    --name tinc \
-    --net=host \
-    --device=/dev/net/tun \
-    --cap-add NET_ADMIN \
-    --volume ${PWD}/config/tinc:/etc/tinc \
-    colachen/tinc
-```
+1. `mkdir venus` first create dir for configs
 
-This will start a container loading persisted configuration from `/config/tinc` and creating the VPN on the host network.
+2. Run container to setup:
+
+```shell
+docker run -it --rm\
+    --name tinc \
+    --volume ${PWD}/venus/:/etc/tinc \
+    colachen/tinc sh
+```
 
 ### Configure per server settings
 
-On each server, create a /etc/tinc/venus/tinc.conf file. `venus` is the name of the VPN server, it can be whatever you like. This is a example configuration for server A:
+On each server, create a /etc/tinc/tinc.conf file. `venus` is the name of the VPN server, it can be whatever you like. This is a example configuration for server A:
+
+3. `vi /etc/tinc/tinc.conf`
 
 ```tinc.conf
 Name=A
@@ -43,9 +44,11 @@ Device=/dev/net/tun
 ```
 
 Change the name on other servers.
-On each server, create a /etc/tinc./venus/tinc-up script.
+
+4. On each server, create a /etc/tinc/tinc-up script.
 
 ```
+#!/bin/sh
 # This is for server A
 ip link set $INTERFACE up
 ip addr add 192.168.0.1/29 dev $INTERFACE
@@ -68,15 +71,15 @@ ip route add 192.168.130.0/24 dev $INTERFACE
 
 The ip route statements tells the local gateway to route traffic bound for the other two campuses through the tinc VPN interface.
 
-Make the script executable:
-`chmod a+x /etc/tinc/venus/tinc-up`
+5. Make the script executable:
+   `chmod a+x /etc/tinc/tinc-up`
 
 ### Create the site specific configuration file
 
-Each site has a specific configuration file that is shared will all other sites.
+6. Each site has a specific configuration file that is shared will all other sites.
 
 **Server A**
-Create /etc/tinc/venus/hosts/serverA:
+Create /etc/tinc/hosts/serverA:
 
 ```
 Subnet = 192.168.0.1/32
@@ -89,7 +92,7 @@ Subnet = 192.168.110.0/24
 ```
 
 **Server B**
-Create /etc/tinc/venus/hosts/serverB:
+Create /etc/tinc/hosts/serverB:
 
 ```
 Subnet = 192.168.0.2/32
@@ -102,7 +105,7 @@ Subnet = 192.168.120.0/24
 ```
 
 **Server C**
-Create /etc/tinc/venus/hosts/serverC:
+Create /etc/tinc/hosts/serverC:
 
 ```
 Subnet = 192.168.0.3/32
@@ -121,32 +124,55 @@ The ConnectTo statements connect to both of the other nodes. This creates a venu
 
 ### Create the public and private keys
 
-On each node, run:
+7. On each node, run:
 
-`tincd -n venus -K`
+`tincd -K`
 
 It will generate the public and private RSA keys, and prompt you if its ok to put them in:
 
 ```
-/etc/tinc/venus/rsa_key.priv
-/etc/tinc/venus/hosts/hostname
+/etc/tinc/rsa_key.priv
+/etc/tinc/hosts/hostname
 
 ```
 
 ### Copy the host file to the other hosts
 
-For each node, scp (or other means) the /etc/tinc/venus/hosts/hostname file to the other node. In the end, the hosts directory on all three nodes will have three identical files.
+8. For each node, scp (or other means) the /etc/tinc/hosts/hostname file to the other node. In the end, the hosts directory on all three nodes will have three identical files.
 
 ### Directory tree for a running tinc configuration
 
 ```
 /etc/tinc
-/etc/tinc/venus
-/etc/tinc/venus/rsa_key.priv               <- unique to each host
-/etc/tinc/venus/tinc.conf                  <- unique to each host
-/etc/tinc/venus/tinc-up                    <- unique to each host
-/etc/tinc/venus/hosts
-/etc/tinc/venus/hosts/serverA              <- same on all hosts
-/etc/tinc/venus/hosts/serverB              <- same on all hosts
-/etc/tinc/venus/hosts/serverC              <- same on all hosts
+/etc/tinc
+/etc/tinc/rsa_key.priv               <- unique to each host
+/etc/tinc/tinc.conf                  <- unique to each host
+/etc/tinc/tinc-up                    <- unique to each host
+/etc/tinc/hosts
+/etc/tinc/hosts/serverA              <- same on all hosts
+/etc/tinc/hosts/serverB              <- same on all hosts
+/etc/tinc/hosts/serverC              <- same on all hosts
+```
+
+9. Finally start the service:
+
+```shell
+docker run -d \
+    --name tinc \
+    --net=host \
+    --device=/dev/net/tun \
+    --cap-add NET_ADMIN \
+    --volume ${PWD}/venus:/etc/tinc \
+    colachen/tinc
+```
+
+This will start a container loading persisted configuration from `/config/tinc` and creating the VPN on the host network.
+
+## Tips:
+
+If you run this on an gateway and want to bypass subnet. Remember to check the `/proc/sys/net/ipv4/ip_forward` value and configure iptables to do SNAT like this:
+
+```shell
+sudo iptables -P FORWARD ACCEPT (maybe you can adjust it depends on your situation)
+sudo iptables -t nat -A POSTROUTING -o enp0s25 -s 192.168.254.248/29 -p icmp -j SNAT --to 192.168.2.160
 ```
